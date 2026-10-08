@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#fff7e7">
+  <title>开心炸弹 · 一起倒数吧！</title>
+  <style>
+    :root {
+      --paper: #fff7e7; --ink: #40352d; --muted: #76604c;
+      --red: #c8422f; --red-dark: #943020; --yellow: #ffd35d;
+      --line: #ead9bb; --blue: #277c88; --ease: cubic-bezier(.22, 1, .36, 1);
+      font-family: ui-rounded, "Hiragino Maru Gothic ProN", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--ink); background: var(--paper);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 280px; }
+    button, input { font: inherit; }
+    button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible + span { outline: 3px solid var(--blue); outline-offset: 5px; }
+    button:disabled { cursor: default; }
+    [hidden] { display: none !important; }
+    .page { max-width: 1100px; margin: auto; padding: 24px max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)); }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 9px; font-weight: 850; font-size: 1rem; }
+    .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; background: var(--yellow); border: 2px solid var(--ink); border-radius: 50%; font-size: 1.2rem; }
+    .sound { display: flex; align-items: center; gap: 7px; min-height: 46px; border: 1.5px solid var(--line); border-radius: 30px; padding: 8px 14px; color: var(--ink); background: #fffcf4; font-size: .875rem; font-weight: 700; }
+    .sound svg { width: 19px; height: 19px; }
+    .sound[aria-pressed="false"] .sound-waves { display: none; }
+    .intro { text-align: center; margin: 35px 0 8px; }
+    .eyebrow { display: inline-block; color: var(--blue); font-size: .8125rem; font-weight: 800; letter-spacing: .16em; }
+    h1 { margin: 12px 0 10px; font-size: clamp(2.4rem, 7vw, 4.5rem); line-height: 1.15; font-weight: 950; letter-spacing: -.04em; }
+    h1 .accent { color: var(--red); display: inline-block; transform: rotate(-4deg); }
+    .intro p { color: var(--muted); margin: 0; font-size: 1rem; line-height: 1.7; }
+    .playground { position: relative; isolation: isolate; margin: 0 auto; }
+    .stage { position: relative; height: 365px; overflow: hidden; }
+    .halo { position: absolute; width: 300px; height: 300px; border-radius: 50%; background: #ffe6a4; left: 50%; top: 26px; transform: translateX(-50%); }
+    .halo::after { content: ""; position: absolute; inset: -17px; border: 1.5px dashed #ddc08b; border-radius: 50%; }
+    .ground { width: 215px; height: 22px; border-radius: 50%; background: #e4c890; position: absolute; left: 50%; bottom: 32px; transform: translateX(-50%); opacity: .6; }
+    .bomb-wrap { position: absolute; left: 50%; top: 10px; width: 310px; height: 310px; margin-left: -155px; transform-origin: 50% 78%; }
+    .bomb { width: 100%; height: 100%; overflow: visible; }
+    .spark { transform-box: fill-box; transform-origin: center; }
+    .counting .spark { animation: sparkle .55s linear infinite alternate; }
+    .counting .bomb-wrap { animation: wiggle .6s ease-in-out infinite; }
+    .counting.urgent .bomb-wrap { animation-duration: .28s; }
+    .counting .fuse-cover { stroke-dashoffset: 94; transition: stroke-dashoffset var(--fuse-time) linear; }
+    .burst .bomb-wrap, .done .bomb-wrap { opacity: 0; transform: scale(.4); transition: transform .22s var(--ease), opacity .18s; }
+    .bubble { position: absolute; left: calc(50% + 104px); top: 72px; padding: 12px 19px; border: 2px solid var(--ink); border-radius: 22px 22px 22px 4px; background: #fffcf4; font-size: 1rem; font-weight: 800; transform: rotate(7deg); white-space: nowrap; }
+    .counting .bubble, .burst .bubble, .done .bubble { opacity: 0; }
+    .doodle { position: absolute; font-weight: 850; user-select: none; }
+    .star { color: var(--red); font-size: 2.8rem; left: calc(50% - 244px); top: 110px; transform: rotate(-15deg); }
+    .little-star { color: var(--blue); font-size: 2rem; left: calc(50% + 199px); top: 245px; transform: rotate(15deg); }
+    .swirl { color: var(--blue); font-size: 3.3rem; left: calc(50% - 220px); top: 245px; transform: rotate(-20deg); }
+    .dot { width: 12px; height: 12px; border: 3px solid #c77839; border-radius: 50%; left: calc(50% + 228px); top: 165px; }
+    .counter { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 9px; min-width: 105px; min-height: 66px; padding: 3px 20px; background: #fffcf4; border: 2px solid var(--ink); border-radius: 20px; box-shadow: 0 4px 0 var(--ink); }
+    #number { font-size: 2.6rem; line-height: 1.2; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .counter small { font-size: .875rem; color: var(--muted); }
+    .counting .counter { background: var(--yellow); }
+    .burst .counter, .done .counter { visibility: hidden; }
+    #confetti { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; }
+    .explosion { position: absolute; width: 320px; height: 290px; top: 30px; left: 50%; margin-left: -160px; opacity: 0; pointer-events: none; }
+    .explosion svg { width: 100%; height: 100%; overflow: visible; }
+    .burst .explosion, .done .explosion { opacity: 1; }
+    .burst .explosion { animation: pop .65s var(--ease) both; }
+    .explosion-text { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; transform: rotate(-8deg); padding-top: 10px; }
+    .explosion-text strong { color: var(--ink); font-size: 4.7rem; font-weight: 950; line-height: 1; letter-spacing: -.06em; }
+    .explosion-text span { font-size: 1.2rem; font-weight: 800; margin-top: 10px; }
+    .controls { text-align: center; position: relative; z-index: 4; }
+    .status { margin: 16px 0 20px; min-height: 28px; color: var(--muted); font-size: 1rem; line-height: 1.75; }
+    .status strong { color: var(--red); }
+    fieldset { border: 0; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    legend { float: left; margin-right: 4px; color: var(--muted); font-size: .875rem; line-height: 48px; }
+    .duration { position: relative; }
+    .duration input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; margin: 0; }
+    .duration span { display: block; min-width: 63px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; font-size: 1rem; font-weight: 750; background: #fffcf4; }
+    .duration input:checked + span { border-color: var(--ink); background: var(--yellow); box-shadow: 0 2px 0 var(--ink); }
+    .duration input:disabled { cursor: default; }
+    fieldset:disabled { opacity: .6; }
+    .primary { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 24px auto 0; width: min(100%, 330px); min-height: 72px; padding: 16px 24px; border: 2px solid var(--red-dark); border-radius: 22px; background: var(--red); color: #fffaf0; box-shadow: 0 6px 0 var(--red-dark); font-size: 1.5rem; font-weight: 850; transition: transform .15s var(--ease), box-shadow .15s var(--ease); }
+    .primary svg { width: 25px; height: 25px; }
+    .primary:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 1px 0 var(--red-dark); }
+    .primary:disabled { background: #9d503e; border-color: #763b2d; box-shadow: 0 6px 0 #763b2d; }
+    .secondary { color: var(--muted); background: transparent; border: 0; min-height: 48px; padding: 10px 20px; margin-top: 9px; font-size: 1rem; text-decoration: underline; text-underline-offset: 5px; }
+    .helper { color: var(--muted); font-size: .8125rem; line-height: 1.7; min-height: 25px; margin: 18px 0 0; }
+    footer { margin-top: 35px; padding-top: 18px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: .8125rem; line-height: 1.7; }
+    .footer-stars { color: var(--red); letter-spacing: 5px; }
+    @media (hover: hover) { .primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 0 var(--red-dark); } .sound:hover { background: #ffe6a4; } }
+    @media (min-width: 700px) { .page { padding-top: 28px; } .intro { margin-top: 40px; } .stage { height: 370px; } }
+    @media (max-width: 460px) {
+      .page { padding-top: 14px; } .brand { font-size: .875rem; } .sound { padding: 8px 10px; }
+      .intro { margin-top: 27px; } .intro p { font-size: .875rem; } h1 { margin-top: 10px; }
+      .stage { height: 315px; } .halo { width: 242px; height: 242px; top: 25px; }
+      .bomb-wrap { width: 270px; height: 270px; margin-left: -135px; top: 1px; }
+      .ground { bottom: 27px; width: 185px; } .bubble { top: 45px; left: calc(50% + 62px); font-size: .8125rem; padding: 9px 11px; }
+      .star { left: 4px; top: 110px; font-size: 2rem; } .little-star { left: auto; right: 1px; top: 223px; }
+      .swirl, .dot { display: none; } .counter { min-height: 56px; bottom: 0; } #number { font-size: 2.2rem; }
+      .explosion { width: 270px; height: 250px; margin-left: -135px; top: 22px; } .explosion-text strong { font-size: 4rem; }
+      .status { margin: 14px 0; } .primary { margin-top: 21px; min-height: 68px; } footer { margin-top: 28px; }
+    }
+    @media (max-width: 340px) {
+      fieldset { gap: 6px; } legend { margin-right: 0; }
+      .duration span { min-width: 54px; padding: 12px 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+    @keyframes wiggle { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg) translateY(-3px); } }
+    @keyframes sparkle { from { transform: scale(.8) rotate(-8deg); } to { transform: scale(1.15) rotate(8deg); } }
+    @keyframes pop { 0% { transform: scale(.2) rotate(-12deg); opacity: 0; } 70% { transform: scale(1.05) rotate(2deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span> 小小开心游乐场</div>
+      <button class="sound" id="sound" type="button" aria-pressed="true" aria-label="声音，点击关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M11 4 6 8H3v8h3l5 4Z" stroke-linejoin="round"/><g class="sound-waves"><path d="M15 8a6 6 0 0 1 0 8M18 5a10 10 0 0 1 0 14" stroke-linecap="round"/></g></svg>
+        <span id="sound-label">声音开</span>
+      </button>
+    </header>
+    <main>
+      <div class="intro">
+        <span class="eyebrow">滴 · 滴 · 滴 · 砰！</span>
+        <h1>一颗<span class="accent">开心炸弹</span></h1>
+        <p>和小炸弹一起倒数，看看会蹦出什么！</p>
+      </div>
+      <div class="playground" id="playground" data-state="ready">
+        <div class="stage" id="stage">
+          <div class="halo" aria-hidden="true"></div>
+          <span class="doodle star" aria-hidden="true">✦</span>
+          <span class="doodle little-star" aria-hidden="true">✧</span>
+          <span class="doodle swirl" aria-hidden="true">〰</span>
+          <span class="doodle dot" aria-hidden="true"></span>
+          <div class="ground" aria-hidden="true"></div>
+          <div class="bomb-wrap" aria-hidden="true">
+            <svg class="bomb" viewBox="0 0 340 340" fill="none">
+              <defs><radialGradient id="body-shine" cx=".32" cy=".23" r=".9"><stop stop-color="#526173"/><stop offset="1" stop-color="#263343"/></radialGradient></defs>
+              <path d="M193 107C199 70 255 84 256 42" stroke="#40352d" stroke-width="12" stroke-linecap="round"/>
+              <path d="M193 107C199 70 255 84 256 42" stroke="#d7b984" stroke-width="6" stroke-linecap="round"/>
+              <path class="fuse-cover" d="M256 42C255 84 199 70 193 107" stroke="#40352d" stroke-width="7" stroke-linecap="round" stroke-dasharray="94" stroke-dashoffset="0"/>
+              <g class="spark"><path d="m258 23 7 10 13-3-5 12 10 9-14 2-5 13-8-11-14 3 6-13-9-10 14-1Z" fill="#ffd35d" stroke="#c77839" stroke-width="2"/><path d="m253 13-2-8m29 15 7-5m-1 44 8 4m-55-42-6-5" stroke="#c77839" stroke-width="3" stroke-linecap="round"/></g>
+              <path d="m159 107 6-19c2-6 42-3 43 4l-1 20" fill="#526173" stroke="#263343" stroke-width="5"/>
+              <circle cx="170" cy="206" r="103" fill="url(#body-shine)" stroke="#263343" stroke-width="5"/>
+              <path d="M104 162c9-16 23-28 41-33" stroke="#8898a8" stroke-width="11" stroke-linecap="round" opacity=".65"/>
+              <ellipse cx="111" cy="226" rx="16" ry="10" fill="#f49e8f"/>
+              <ellipse cx="231" cy="226" rx="16" ry="10" fill="#f49e8f"/>
+              <ellipse cx="137" cy="204" rx="8" ry="12" fill="#fff7e7"/>
+              <ellipse cx="205" cy="204" rx="8" ry="12" fill="#fff7e7"/>
+              <path d="M150 229c7 19 33 19 41 0" stroke="#fff7e7" stroke-width="6" stroke-linecap="round"/>
+              <path d="M77 244 55 255m208-12 23 13" stroke="#263343" stroke-width="9" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="bubble" aria-hidden="true">准备好了吗？</div>
+          <div class="counter" role="timer" aria-label="倒计时" aria-live="off"><span id="number">5</span><small>秒</small></div>
+          <div class="explosion" aria-hidden="true">
+            <svg viewBox="0 0 340 310"><path d="m170 11 29 43 54-25 2 55 64 9-32 48 41 39-58 24 4 59-61-16-35 50-31-44-56 26-7-58-61-9 31-50L13 123l60-20-1-59 57 21Z" fill="#ffd35d" stroke="#40352d" stroke-width="4" stroke-linejoin="round"/><path d="m40 17-11-8m282 34 14-11M5 236l-14 8m315 37 14 9" stroke="#c8422f" stroke-width="5" stroke-linecap="round"/></svg>
+            <div class="explosion-text"><strong>砰！</strong><span>快乐蹦出来啦</span></div>
+          </div>
+          <canvas id="confetti" aria-hidden="true"></canvas>
+        </div>
+        <div class="controls">
+          <p class="status" id="status" role="status" aria-live="polite">准备好，一起数 <strong>5、4、3、2、1！</strong></p>
+          <fieldset id="durations"><legend>倒数多久</legend>
+            <label class="duration"><input type="radio" name="duration" value="3"><span>3 秒</span></label>
+            <label class="duration"><input type="radio" name="duration" value="5" checked><span>5 秒</span></label>
+            <label class="duration"><input type="radio" name="duration" value="10"><span>10 秒</span></label>
+          </fieldset>
+          <button class="primary" id="start" type="button"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 3.8c0-.7.8-1.1 1.4-.7l14 8.2a.8.8 0 0 1 0 1.4l-14 8.2c-.6.4-1.4 0-1.4-.7Z"/></svg><span id="start-label">开始倒计时</span></button>
+          <button class="secondary" id="stop" type="button" hidden>先停一下</button>
+          <p class="helper" id="helper">点一下开始，听听它的滴滴声 ♪</p>
+        </div>
+      </div>
+      <noscript><p>请在浏览器中开启 JavaScript，才能播放倒计时和动画。</p></noscript>
+    </main>
+    <footer><span>一颗小炸弹，一大把快乐。</span><span class="footer-stars" aria-hidden="true">✦ ✧ ✦</span></footer>
+  </div>
+  <script>
+    (() => {
+      'use strict';
+      const playground = document.getElementById('playground');
+      const stage = document.getElementById('stage');
+      const number = document.getElementById('number');
+      const status = document.getElementById('status');
+      const startButton = document.getElementById('start');
+      const startLabel = document.getElementById('start-label');
+      const stopButton = document.getElementById('stop');
+      const durations = document.getElementById('durations');
+      const soundButton = document.getElementById('sound');
+      const soundLabel = document.getElementById('sound-label');
+      const helper = document.getElementById('helper');
+      const canvas = document.getElementById('confetti');
+      const context = canvas.getContext('2d');
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let duration = 5;
+      let state = 'ready';
+      let soundEnabled = true;
+      let audio = null;
+      let master = null;
+      let audioFailed = false;
+      let tickFrame = 0;
+      let particleFrame = 0;
+      let finishTimer = 0;
+      let endAt = 0;
+      let lastBeepAt = 0;
+      let shownSecond = 5;
+      let particles = [];
+      let width = 0;
+      let height = 0;
+
+      function setState(next) {
+        state = next;
+        playground.dataset.state = next;
+        playground.className = 'playground' + (next === 'ready' ? '' : ' ' + next);
+      }
+
+      function updateHelper() {
+        helper.textContent = audioFailed && soundEnabled
+          ? '声音暂时不能播放，仍然可以看动画哦。'
+          : soundEnabled ? '点一下开始，听听它的滴滴声 ♪' : '安静玩也很开心，彩色纸屑照样飞！';
+      }
+
+      function unlockAudio() {
+        if (!soundEnabled) return;
+        try {
+          if (!audio) {
+            const Audio = window.AudioContext || window.webkitAudioContext;
+            if (!Audio) throw new Error('Audio unavailable');
+            audio = new Audio();
+            master = audio.createGain();
+            master.gain.value = .45;
+            master.connect(audio.destination);
+          }
+          audio.resume().then(() => {
+            audioFailed = audio.state !== 'running';
+            updateHelper();
+          }).catch(() => { audioFailed = true; updateHelper(); });
+        } catch (_) { audioFailed = true; updateHelper(); }
+      }
+
+      function tone(frequency, length, offset = 0, volume = .16) {
+        if (!soundEnabled || !audio || audio.state !== 'running') return;
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        const when = audio.currentTime + offset;
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(frequency, when);
+        gain.gain.setValueAtTime(0, when);
+        gain.gain.linearRampToValueAtTime(volume, when + .012);
+        gain.gain.exponentialRampToValueAtTime(.001, when + length);
+        oscillator.connect(gain);
+        gain.connect(master);
+        oscillator.start(when);
+        oscillator.stop(when + length + .02);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      }
+
+      function boomSound() {
+        if (!soundEnabled || !audio || audio.state !== 'running') return;
+        const when = audio.currentTime;
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.frequency.setValueAtTime(145, when);
+        oscillator.frequency.exponentialRampToValueAtTime(42, when + .38);
+        gain.gain.setValueAtTime(0, when);
+        gain.gain.linearRampToValueAtTime(.4, when + .025);
+        gain.gain.exponentialRampToValueAtTime(.001, when + .55);
+        oscillator.connect(gain); gain.connect(master);
+        oscillator.start(when); oscillator.stop(when + .6);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+        [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => tone(frequency, .28, .22 + i * .12, .12));
+      }
+
+      function resizeCanvas() {
+        const rect = stage.getBoundingClientRect();
+        width = rect.width; height = rect.height;
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.round(width * ratio);
+        canvas.height = Math.round(height * ratio);
+        if (context) context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      }
+
+      function drawParticle(p, alpha) {
+        context.save();
+        context.globalAlpha = alpha;
+        context.translate(p.x, p.y);
+        context.rotate(p.angle);
+        context.fillStyle = p.color;
+        if (p.kind === 0) {
+          context.fillRect(-p.size / 2, -p.size / 3, p.size, p.size * .65);
+        } else if (p.kind === 1) {
+          context.beginPath(); context.arc(0, 0, p.size * .4, 0, Math.PI * 2); context.fill();
+        } else {
+          context.beginPath();
+          for (let j = 0; j < 10; j++) {
+            const angle = j * Math.PI / 5 - Math.PI / 2;
+            const radius = j % 2 === 0 ? p.size * .7 : p.size * .3;
+            if (j === 0) context.moveTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+            else context.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+          }
+          context.closePath(); context.fill();
+        }
+        context.restore();
+      }
+
+      function launchConfetti() {
+        if (!context) return;
+        resizeCanvas();
+        const colors = ['#c8422f', '#f0b832', '#277c88', '#ef917a', '#738f4c', '#9263a9'];
+        particles = Array.from({ length: reducedMotion.matches ? 24 : 125 }, (_, i) => ({
+          x: width / 2, y: height * .48,
+          vx: (Math.random() - .5) * 670,
+          vy: -100 - Math.random() * 430,
+          angle: Math.random() * Math.PI * 2,
+          spin: (Math.random() - .5) * 10,
+          size: 7 + Math.random() * 11,
+          color: colors[i % colors.length], kind: i % 3
+        }));
+        if (reducedMotion.matches) {
+          particles.forEach((p, i) => {
+            const angle = i / particles.length * Math.PI * 2;
+            p.x = width / 2 + Math.cos(angle) * Math.min(width * .42, 210);
+            p.y = height * .46 + Math.sin(angle) * 130;
+            drawParticle(p, 1);
+          });
+          return;
+        }
+        const born = performance.now();
+        let previous = born;
+        function animate(now) {
+          const elapsed = (now - born) / 1000;
+          const delta = Math.min((now - previous) / 1000, .04);
+          previous = now;
+          context.clearRect(0, 0, width, height);
+          particles.forEach(p => {
+            p.vx *= Math.pow(.985, delta * 60);
+            p.vy += 300 * delta;
+            p.x += p.vx * delta; p.y += p.vy * delta; p.angle += p.spin * delta;
+            drawParticle(p, Math.min(1, Math.max(0, (3.1 - elapsed) / .8)));
+          });
+          if (elapsed < 3.1) particleFrame = requestAnimationFrame(animate);
+          else { context.clearRect(0, 0, width, height); particles = []; particleFrame = 0; }
+        }
+        particleFrame = requestAnimationFrame(animate);
+      }
+
+      function clearPlayback() {
+        cancelAnimationFrame(tickFrame);
+        cancelAnimationFrame(particleFrame);
+        clearTimeout(finishTimer);
+        tickFrame = particleFrame = finishTimer = 0;
+        particles = [];
+        if (context) context.clearRect(0, 0, width, height);
+      }
+
+      function ready() {
+        clearPlayback();
+        setState('ready');
+        number.textContent = duration;
+        status.textContent = duration === 5 ? '准备好，一起数 5、4、3、2、1！' : '准备好，一起从 ' + duration + ' 数到 1！';
+        startButton.disabled = false;
+        startLabel.textContent = '开始倒计时';
+        durations.disabled = false;
+        stopButton.hidden = true;
+      }
+
+      function explode() {
+        tickFrame = 0;
+        number.textContent = '0';
+        setState('burst');
+        status.textContent = '哇！好多彩色纸屑！';
+        startLabel.textContent = '快乐蹦出来啦';
+        stopButton.hidden = true;
+        boomSound();
+        launchConfetti();
+        finishTimer = window.setTimeout(() => {
+          finishTimer = 0;
+          setState('done');
+          startButton.disabled = false;
+          durations.disabled = false;
+          startLabel.textContent = '再玩一次';
+          status.textContent = '太棒啦！要不要再来一次？';
+        }, reducedMotion.matches ? 600 : 1800);
+      }
+
+      function tick(now) {
+        if (state !== 'counting') return;
+        const remaining = Math.max(0, endAt - now);
+        if (remaining === 0) { explode(); return; }
+        const second = Math.ceil(remaining / 1000);
+        if (second !== shownSecond) {
+          shownSecond = second;
+          number.textContent = second;
+          status.textContent = second <= 3 ? '滴滴滴！快乐马上就来！' : '跟着小炸弹一起倒数吧！';
+        }
+        const interval = remaining <= 1100 ? 200 : remaining <= 3100 ? 350 : 1000;
+        if (now - lastBeepAt >= interval) {
+          tone(remaining <= 3100 ? 940 : 760, .09);
+          lastBeepAt = now;
+        }
+        playground.classList.toggle('urgent', remaining <= 3100);
+        tickFrame = requestAnimationFrame(tick);
+      }
+
+      function start() {
+        if (state === 'counting' || state === 'burst') return;
+        clearPlayback();
+        unlockAudio();
+        // Restore the fuse before its next transition, including repeated rounds.
+        setState('ready');
+        void playground.offsetWidth;
+        playground.style.setProperty('--fuse-time', duration + 's');
+        setState('counting');
+        shownSecond = duration;
+        number.textContent = duration;
+        status.textContent = '跟着小炸弹一起倒数吧！';
+        startButton.disabled = true;
+        startLabel.textContent = '一起倒数…';
+        durations.disabled = true;
+        stopButton.hidden = false;
+        const now = performance.now();
+        endAt = now + duration * 1000;
+        lastBeepAt = now - 1000;
+        tickFrame = requestAnimationFrame(tick);
+      }
+
+      startButton.addEventListener('click', start);
+      stopButton.addEventListener('click', () => { ready(); status.textContent = '停好啦，准备好了再开始。'; startButton.focus(); });
+      durations.addEventListener('change', event => {
+        duration = Number(event.target.value);
+        ready();
+      });
+      soundButton.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundButton.setAttribute('aria-pressed', String(soundEnabled));
+        soundButton.setAttribute('aria-label', soundEnabled ? '声音，点击关闭' : '声音，点击开启');
+        soundLabel.textContent = soundEnabled ? '声音开' : '声音关';
+        if (master) master.gain.setTargetAtTime(soundEnabled ? .45 : 0, audio.currentTime, .01);
+        if (soundEnabled) { unlockAudio(); tone(660, .1); }
+        updateHelper();
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && state === 'counting') { ready(); startButton.focus(); }
+      });
+      // Pause by resetting when the page is hidden; returning never triggers a surprise boom.
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && (state === 'counting' || state === 'burst')) {
+          ready(); status.textContent = '回来啦！点一下，就能重新开始。';
+        }
+        if (document.hidden && audio) audio.suspend().catch(() => {});
+      });
+      window.addEventListener('resize', () => {
+        resizeCanvas();
+        if (reducedMotion.matches && (state === 'burst' || state === 'done')) particles.forEach(p => drawParticle(p, 1));
+      });
+      reducedMotion.addEventListener('change', () => {
+        cancelAnimationFrame(particleFrame);
+        particleFrame = 0;
+        if (context) context.clearRect(0, 0, width, height);
+        if (state === 'burst' || state === 'done') launchConfetti();
+      });
+      resizeCanvas();
+    })();
+  </script>
+</body>
+</html>
