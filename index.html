@@ -196,6 +196,7 @@
       let soundEnabled = true;
       let audio = null;
       let master = null;
+      let explosionBuffer = null;
       let audioFailed = false;
       let tickFrame = 0;
       let particleFrame = 0;
@@ -254,20 +255,82 @@
         oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
       }
 
+      function createExplosionBuffer() {
+        // Original layered effect: pressure crack, rolling bass, metallic debris and echoes.
+        // Render once in memory so replay needs no downloads or network connection.
+        const rate = audio.sampleRate;
+        const length = Math.ceil(rate * 2.1);
+        const buffer = audio.createBuffer(2, length, rate);
+        let seed = 1987;
+        function noise() {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 2147483648 - 1;
+        }
+        const debris = [.13, .23, .34, .48, .65, .83];
+        const dry = new Float32Array(length);
+        const debrisPan = new Float32Array(length);
+        let bass = 0;
+        let air = 0;
+        let previousAir = 0;
+        let phase = 0;
+        const bassAlpha = 1 - Math.exp(-2 * Math.PI * 190 / rate);
+        const airAlpha = 1 - Math.exp(-2 * Math.PI * 2800 / rate);
+        let peak = 0;
+        for (let i = 0; i < length; i++) {
+          const t = i / rate;
+          const random = noise();
+          bass += bassAlpha * (random - bass);
+          air += airAlpha * (random - air);
+          const crack = air - previousAir;
+          previousAir = air;
+          const attack = Math.min(1, t / .005);
+          const rolling = Math.exp(-t * 3.7) * (1 + .17 * Math.sin(t * 31));
+          phase += 2 * Math.PI * (48 + 88 * Math.exp(-t * 16)) / rate;
+          let sample = attack * (
+            1.65 * crack * Math.exp(-t * 27) +
+            2.8 * bass * rolling +
+            .42 * Math.sin(phase) * Math.exp(-t * 7) +
+            .32 * air * Math.exp(-t * 5.5)
+          );
+          let fragments = 0;
+          debris.forEach((at, j) => {
+            const dt = t - at;
+            if (dt < 0 || dt > .24) return;
+            const envelope = Math.min(1, dt / .003) * Math.exp(-dt * (30 + j * 3));
+            const ring = Math.sin(2 * Math.PI * (720 + j * 137) * dt) +
+              .3 * Math.sin(2 * Math.PI * (1193 + j * 183) * dt);
+            const fragment = envelope * (.085 * ring + .17 * crack) / (1 + j * .2);
+            sample += fragment;
+            fragments += fragment * (j % 2 === 0 ? -.42 : .42);
+          });
+          dry[i] = Math.tanh(sample * 1.3);
+          debrisPan[i] = fragments;
+        }
+        const left = buffer.getChannelData(0);
+        const right = buffer.getChannelData(1);
+        const firstEcho = Math.round(rate * .137);
+        const secondEcho = Math.round(rate * .281);
+        for (let i = 0; i < length; i++) {
+          const tail = Math.min(1, (length - i - 1) / (rate * .08));
+          const echo1 = i >= firstEcho ? dry[i - firstEcho] * .13 : 0;
+          const echo2 = i >= secondEcho ? dry[i - secondEcho] * .07 : 0;
+          left[i] = (dry[i] + echo1 + echo2 * .65 + debrisPan[i]) * tail;
+          right[i] = (dry[i] + echo1 * .65 + echo2 - debrisPan[i]) * tail;
+          peak = Math.max(peak, Math.abs(left[i]), Math.abs(right[i]));
+        }
+        const level = .82 / Math.max(peak, .01);
+        for (let i = 0; i < length; i++) { left[i] *= level; right[i] *= level; }
+        return buffer;
+      }
+
       function boomSound() {
         if (!soundEnabled || !audio || audio.state !== 'running') return;
-        const when = audio.currentTime;
-        const oscillator = audio.createOscillator();
-        const gain = audio.createGain();
-        oscillator.frequency.setValueAtTime(145, when);
-        oscillator.frequency.exponentialRampToValueAtTime(42, when + .38);
-        gain.gain.setValueAtTime(0, when);
-        gain.gain.linearRampToValueAtTime(.4, when + .025);
-        gain.gain.exponentialRampToValueAtTime(.001, when + .55);
-        oscillator.connect(gain); gain.connect(master);
-        oscillator.start(when); oscillator.stop(when + .6);
-        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
-        [523.25, 659.25, 783.99, 1046.5].forEach((frequency, i) => tone(frequency, .28, .22 + i * .12, .12));
+        if (!explosionBuffer) explosionBuffer = createExplosionBuffer();
+        const source = audio.createBufferSource();
+        source.buffer = explosionBuffer;
+        source.connect(master);
+        source.start();
+        source.onended = () => source.disconnect();
       }
 
       function resizeCanvas() {
